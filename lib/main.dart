@@ -48,7 +48,7 @@ class MyAppState extends State<MyApp> {
                   ),
                 ),
                 Flexible(
-                  flex: 1,
+                  flex: 2,
                   child: Column(
 
                       children: [
@@ -77,6 +77,10 @@ class MyAppState extends State<MyApp> {
                               ElevatedButton(
                             child: const Text("Location info Write"),
                             onPressed:() =>  _ndefWriteLocation(context)),
+
+                              ElevatedButton(
+                            child: const Text("Whatsapp info Write"),
+                            onPressed:() =>  _ndefWriteWhatsApp(context)),
                             
                         ElevatedButton(
                             child: const Text('Application Launch Write'),
@@ -132,6 +136,72 @@ class MyAppState extends State<MyApp> {
       },
     );
   }
+
+
+
+void _ndefWriteWhatsApp(context) {
+  try {
+    // Stop the current NFC session if there's one
+    NfcManager.instance.stopSession();
+  } catch (e) {
+    // Handle any errors if stopping the session fails
+  }
+
+  // Display a dialog
+  dialogContent(context);
+
+  // Define the recipient's phone number (with country code)
+  String phoneNumber = "+923355105223"; // Replace with the actual phone number
+
+  // Define the WhatsApp message
+  String message = "Hello, this is a WhatsApp message."; // Replace with the desired message
+
+  // Create a WhatsApp URL with the phone number and message
+  String whatsappUrl = "https://wa.me/$phoneNumber?text=${Uri.encodeComponent(message)}";
+
+  // Create an NDEF record with a custom MIME type (e.g., "text/uri") for WhatsApp
+  NdefRecord whatsappRecord = NdefRecord.createUri(Uri.parse(whatsappUrl));
+
+  // Start an NFC session
+  NfcManager.instance.startSession(onDiscovered: (NfcTag tag) async {
+    Navigator.pop(context); // Close the dialog
+
+    var ndef = Ndef.from(tag);
+
+    // Check if the NFC tag is writable
+    if (ndef == null || !ndef.isWritable) {
+      result.value = 'Tag is not NDEF writable';
+      NfcManager.instance.stopSession(errorMessage: result.value);
+      return;
+    }
+
+    // Create an NDEF message containing the WhatsApp record
+    NdefMessage message = NdefMessage([whatsappRecord]);
+
+    try {
+      // Write the NDEF message to the tag
+      await ndef.write(message);
+      result.value = 'Success to "NDEF Write"';
+
+      // Delayed session stop to allow time to see the result
+      Future.delayed(Duration(seconds: 1), () {
+        NfcManager.instance.stopSession(errorMessage: result.value.toString());
+      });
+    } catch (e) {
+      result.value = e;
+
+      // Delayed session stop in case of an error
+      Future.delayed(Duration(seconds: 1), () {
+        NfcManager.instance.stopSession(errorMessage: result.value.toString());
+      });
+    }
+  });
+}
+
+
+
+
+
 
 
 
