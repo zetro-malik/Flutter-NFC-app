@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:nfc_manager/nfc_manager.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(MyApp());
@@ -67,6 +70,14 @@ class MyAppState extends State<MyApp> {
                              ElevatedButton(
                             child: const Text("Contact info Write"),
                             onPressed:() =>  _ndefWriteContact(context)),
+                               ElevatedButton(
+                            child: const Text("Wifi info Write"),
+                            onPressed:() =>  _ndefWriteWifi(context)),
+
+                              ElevatedButton(
+                            child: const Text("Location info Write"),
+                            onPressed:() =>  _ndefWriteLocation(context)),
+                            
                         ElevatedButton(
                             child: const Text('Application Launch Write'),
                             onPressed:() =>  _ndefWrite(context)),
@@ -123,6 +134,118 @@ class MyAppState extends State<MyApp> {
   }
 
 
+
+void _ndefWriteWifi(context) {
+  try {
+    // Stop the current NFC session if there's one
+    NfcManager.instance.stopSession();
+  } catch (e) {
+    // Handle any errors if stopping the session fails
+  }
+
+  // Display a dialog
+  dialogContent(context);
+
+  // Define Wi-Fi network information
+  String ssid = "MyWiFiNetwork"; // Replace with the actual SSID
+  String password = "MyPassword";   // Replace with the actual Wi-Fi password
+  String securityType = "WPA";     // Replace with the actual security type (e.g., "WEP", "WPA", "WPA2")
+
+  // Create a Wi-Fi configuration string
+  String wifiConfig = "WIFI:S:$ssid;T:$securityType;P:$password;;";
+
+  // Create an NDEF record with a custom MIME type (e.g., "application/vnd.wfa.wsc") for the Wi-Fi configuration
+  NdefRecord wifiRecord = NdefRecord.createMime("application/vnd.wfa.wsc",   Uint8List.fromList(wifiConfig.codeUnits));
+
+  // Start an NFC session
+  NfcManager.instance.startSession(onDiscovered: (NfcTag tag) async {
+    Navigator.pop(context); // Close the dialog
+
+    var ndef = Ndef.from(tag);
+
+    // Check if the NFC tag is writable
+    if (ndef == null || !ndef.isWritable) {
+      result.value = 'Tag is not NDEF writable';
+      NfcManager.instance.stopSession(errorMessage: result.value);
+      return;
+    }
+
+    // Create an NDEF message containing the Wi-Fi configuration record
+    NdefMessage message = NdefMessage([wifiRecord]);
+
+    try {
+      // Write the NDEF message to the tag
+      await ndef.write(message);
+      result.value = 'Success to "NDEF Write"';
+
+      // Delayed session stop to allow time to see the result
+      Future.delayed(Duration(seconds: 1), () {
+        NfcManager.instance.stopSession(errorMessage: result.value.toString());
+      });
+    } catch (e) {
+      result.value = e;
+
+      // Delayed session stop in case of an error
+      Future.delayed(Duration(seconds: 1), () {
+        NfcManager.instance.stopSession(errorMessage: result.value.toString());
+      });
+    }
+  });
+}
+
+
+void _ndefWriteEmail(context) {
+  try {
+    // Stop the current NFC session if there's one
+    NfcManager.instance.stopSession();
+  } catch (e) {
+    // Handle any errors if stopping the session fails
+  }
+
+  // Display a dialog
+  dialogContent(context);
+
+  // Define the email address
+  String emailAddress = "example@example.com"; // Replace with the actual email address
+
+  // Create an NDEF record with a custom MIME type (e.g., "message/rfc822") for the email address
+  NdefRecord emailRecord = NdefRecord.createMime("message/rfc822", Uint8List.fromList(emailAddress.codeUnits));
+
+  // Start an NFC session
+  NfcManager.instance.startSession(onDiscovered: (NfcTag tag) async {
+    Navigator.pop(context); // Close the dialog
+
+    var ndef = Ndef.from(tag);
+
+    // Check if the NFC tag is writable
+    if (ndef == null || !ndef.isWritable) {
+      result.value = 'Tag is not NDEF writable';
+      NfcManager.instance.stopSession(errorMessage: result.value);
+      return;
+    }
+
+    // Create an NDEF message containing the email record
+    NdefMessage message = NdefMessage([emailRecord]);
+
+    try {
+      // Write the NDEF message to the tag
+      await ndef.write(message);
+      result.value = 'Success to "NDEF Write"';
+
+      // Delayed session stop to allow time to see the result
+      Future.delayed(Duration(seconds: 1), () {
+        NfcManager.instance.stopSession(errorMessage: result.value.toString());
+      });
+    } catch (e) {
+      result.value = e;
+
+      // Delayed session stop in case of an error
+      Future.delayed(Duration(seconds: 1), () {
+        NfcManager.instance.stopSession(errorMessage: result.value.toString());
+      });
+    }
+  });
+}
 
 
   // add link 
@@ -211,6 +334,63 @@ class MyAppState extends State<MyApp> {
 
     // Create an NDEF message containing the vCard record
     NdefMessage message = NdefMessage([mimeRecord]);
+
+    try {
+      // Write the NDEF message to the tag
+      await ndef.write(message);
+      result.value = 'Success to "NDEF Write"';
+
+      // Delayed session stop to allow time to see the result
+      Future.delayed(Duration(seconds: 1), () {
+        NfcManager.instance.stopSession(errorMessage: result.value.toString());
+      });
+    } catch (e) {
+      result.value = e;
+
+      // Delayed session stop in case of an error
+      Future.delayed(Duration(seconds: 1), () {
+        NfcManager.instance.stopSession(errorMessage: result.value.toString());
+      });
+    }
+  });
+}
+
+void _ndefWriteLocation(context) {
+  try {
+    // Stop the current NFC session if there's one
+    NfcManager.instance.stopSession();
+  } catch (e) {
+    // Handle any errors if stopping the session fails
+  }
+
+  // Display a dialog
+  dialogContent(context);
+
+  // Generate random latitude and longitude (replace with your logic)
+  double latitude = -90 + (180 * (Random().nextDouble())); // Random latitude between -90 and 90
+  double longitude = -180 + (360 * (Random().nextDouble())); // Random longitude between -180 and 180
+
+  // Create a location string with the latitude and longitude
+  String location = "geo:$latitude,$longitude";
+
+  // Create an NDEF record with a custom MIME type (e.g., "text/uri") for the location
+  NdefRecord locationRecord = NdefRecord.createUri(Uri.parse(location));
+
+  // Start an NFC session
+  NfcManager.instance.startSession(onDiscovered: (NfcTag tag) async {
+    Navigator.pop(context); // Close the dialog
+
+    var ndef = Ndef.from(tag);
+
+    // Check if the NFC tag is writable
+    if (ndef == null || !ndef.isWritable) {
+      result.value = 'Tag is not NDEF writable';
+      NfcManager.instance.stopSession(errorMessage: result.value);
+      return;
+    }
+
+    // Create an NDEF message containing the location record
+    NdefMessage message = NdefMessage([locationRecord]);
 
     try {
       // Write the NDEF message to the tag
@@ -342,11 +522,11 @@ void _ndefWriteText(context) {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Image.network(
-            'https://assets-v2.lottiefiles.com/a/a68e4064-1166-11ee-a842-97da89eaf7c1/pRpPDA70yq.gif', // NFC GIF URL
-            width: 100,
-            height: 100,
-          ),
+         CachedNetworkImage(
+  imageUrl: 'https://assets-v2.lottiefiles.com/a/a68e4064-1166-11ee-a842-97da89eaf7c1/pRpPDA70yq.gif',
+  width: 100,
+  height: 100,
+),
           const SizedBox(height: 20),
           const Text(
             'Bring the NFC Tag closer to your phone',
