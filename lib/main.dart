@@ -5,11 +5,91 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(MyApp());
+  runApp(MaterialApp(home: GetData(),));
 }
+
+class GetData extends StatefulWidget {
+  const GetData({super.key});
+
+  @override
+  State<GetData> createState() => _GetDataState();
+}
+
+class _GetDataState extends State<GetData> {
+
+  //http://192.168.18.42:5550/sendJson
+  String result = "";
+  String data = "";
+
+
+  post(String ID) async{
+     final response = await http.get(Uri.parse('http://192.168.18.42:5550/getParams/$ID'));
+
+    if (response.statusCode == 200) {
+       data = response.body;
+       setState(() {
+         
+       });
+    } else {
+      throw Exception('Failed to load data');
+    }
+
+  }
+  
+   @override
+  void initState() {
+    super.initState();   
+         NfcManager.instance.startSession(
+      onDiscovered: (NfcTag tag) async {
+    
+        print("Starting reading session");
+        try {
+          Ndef? ndef = Ndef.from(tag);
+          if (ndef != null) {
+            NdefMessage message = await ndef.read(); // Read NDEF message
+            if (message != null) {
+             
+              result = String.fromCharCodes(message.records.first.payload).replaceFirst("en", "");
+              post(result);
+            }
+          } else {
+            result = 'Tag is not NDEF compatible';
+          }
+        } catch (e) {
+          result = 'Error reading NDEF data: $e';
+        } finally {
+          Future.delayed(
+            Duration(seconds: 1),
+            () => NfcManager.instance.stopSession(),
+          );
+        }
+      },
+    );
+  }
+
+
+
+  @override
+  Widget build(BuildContext context) {
+    return  Scaffold(
+      appBar: AppBar(title: Text('NFC App'),),
+      body:Center(
+        child: data=="" ?   CachedNetworkImage(
+                imageUrl:'https://assets-v2.lottiefiles.com/a/a68e4064-1166-11ee-a842-97da89eaf7c1/pRpPDA70yq.gif',
+                
+              ):Text(data) ,
+      )
+    );
+  }
+}
+
+
+
+
 
 class MyApp extends StatefulWidget {
   @override
@@ -17,12 +97,43 @@ class MyApp extends StatefulWidget {
 }
 
 class MyAppState extends State<MyApp> {
+
+     @override
+  void initState() {
+    super.initState();   
+         NfcManager.instance.startSession(
+      onDiscovered: (NfcTag tag) async {
+    
+        print("Starting reading session");
+        try {
+          Ndef? ndef = Ndef.from(tag);
+          if (ndef != null) {
+            NdefMessage message = await ndef.read(); // Read NDEF message
+            if (message != null) {
+              result.value = "";
+              result.value = String.fromCharCodes(message.records.first.payload).replaceFirst("en", "");
+            }
+          } else {
+            result.value = 'Tag is not NDEF compatible';
+          }
+        } catch (e) {
+          result.value = 'Error reading NDEF data: $e';
+        } finally {
+          Future.delayed(
+            Duration(seconds: 1),
+            () => NfcManager.instance.stopSession(),
+          );
+        }
+      },
+    );
+  }
+
   ValueNotifier<dynamic> result = ValueNotifier(null);
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
+   
+    return Scaffold(
         appBar: AppBar(title: const Text('NfcManager Plugin Example')),
         body: SafeArea(
           child: FutureBuilder<bool>(
@@ -84,8 +195,9 @@ class MyAppState extends State<MyApp> {
                   ),
           ),
         ),
-      ),
-    );
+      );
+
+    
   }
 
   //en is language = "en"
@@ -326,7 +438,7 @@ class MyAppState extends State<MyApp> {
         return;
       }
       NdefMessage message = NdefMessage([
-        NdefRecord.createUri(Uri.parse('https://www.google.com/m')),
+        NdefRecord.createUri(Uri.parse('market://details?id=com.supercell.clashroyale')),
       ]);
 
       try {
@@ -484,44 +596,52 @@ class MyAppState extends State<MyApp> {
     });
   }
 
-  void _ndefWriteAppLaunch(context) {
+ void _ndefWriteAppLaunch(context) {
+  try {
+    NfcManager.instance.stopSession();
+  } catch (e) {}
+  dialogContent(context);
+
+  NfcManager.instance.startSession(onDiscovered: (NfcTag tag) async {
+    Navigator.pop(context);
+    var ndef = Ndef.from(tag);
+    if (ndef == null || !ndef.isWritable) {
+      result.value = 'Tag is not ndef writable';
+      NfcManager.instance.stopSession(errorMessage: result.value);
+      return;
+    }
+
+    // Create an NDEF Text Record for the userID
+    NdefRecord userRecord = NdefRecord.createText("userID");
+
+    // Create an NDEF External Record for app launch
+    NdefRecord appRecord = NdefRecord.createExternal('android.com', 'pkg',
+        Uint8List.fromList('com.example.nfc_app'.codeUnits));
+
+    // Create an NDEF message with both records
+    NdefMessage message = NdefMessage([userRecord, appRecord]);
+
     try {
-      NfcManager.instance.stopSession();
-    } catch (e) {}
-    dialogContent(context);
-    NfcManager.instance.startSession(onDiscovered: (NfcTag tag) async {
-      Navigator.pop(context);
-      var ndef = Ndef.from(tag);
-      if (ndef == null || !ndef.isWritable) {
-        result.value = 'Tag is not ndef writable';
-        NfcManager.instance.stopSession(errorMessage: result.value);
-        return;
-      }
-      NdefMessage message = NdefMessage([
-        NdefRecord.createExternal('android.com', 'pkg',
-            Uint8List.fromList('com.example.nfc_app'.codeUnits)),
-      ]);
+      await ndef.write(message);
+      result.value = 'Success to "Ndef Write"';
 
-      try {
-        await ndef.write(message);
-        result.value = 'Success to "Ndef Write"';
+      Future.delayed(
+        Duration(seconds: 1),
+        () => NfcManager.instance
+            .stopSession(errorMessage: result.value.toString()),
+      );
+    } catch (e) {
+      result.value = e;
+      Future.delayed(
+        Duration(seconds: 1),
+        () => NfcManager.instance
+            .stopSession(errorMessage: result.value.toString()),
+      );
+      return;
+    }
+  });
+}
 
-        Future.delayed(
-          Duration(seconds: 1),
-          () => NfcManager.instance
-              .stopSession(errorMessage: result.value.toString()),
-        );
-      } catch (e) {
-        result.value = e;
-        Future.delayed(
-          Duration(seconds: 1),
-          () => NfcManager.instance
-              .stopSession(errorMessage: result.value.toString()),
-        );
-        return;
-      }
-    });
-  }
 
   void _ndefWriteText(context) {
     try {
